@@ -18,6 +18,7 @@ import {
   parseNodePath,
   parseNodeVersion,
   parseResolvedPath,
+  parseSshAuthSock,
   parseToolchainReport,
   probeWslDistros,
 } from "./DesktopWslEnvironment.ts";
@@ -214,6 +215,20 @@ describe("parseResolvedPath", () => {
   it("returns null when the resolved PATH is absent or empty", () => {
     expect(parseResolvedPath("nodePath:/usr/bin/node\n")).toBeNull();
     expect(parseResolvedPath("resolvedPath:\n")).toBeNull();
+  });
+});
+
+describe("parseSshAuthSock", () => {
+  it("returns the SSH agent socket path", () => {
+    expect(parseSshAuthSock("sshAuthSock:/tmp/ssh-abc/agent.42\n")).toBe("/tmp/ssh-abc/agent.42");
+  });
+
+  it("returns null when the SSH agent socket line is absent", () => {
+    expect(parseSshAuthSock("nodePath:/usr/bin/node\nresolvedPath:/usr/bin\n")).toBeNull();
+  });
+
+  it("accepts CRLF output without retaining the carriage return", () => {
+    expect(parseSshAuthSock("sshAuthSock:/tmp/ssh-abc/agent.42\r\n")).toBe("/tmp/ssh-abc/agent.42");
   });
 });
 

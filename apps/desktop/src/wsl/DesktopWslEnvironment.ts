@@ -36,6 +36,7 @@ export type EnsureWslNodePtyResult =
       readonly ok: true;
       readonly nodePath: string;
       readonly resolvedPath: string;
+      readonly sshAuthSock: string | null;
     }
   | {
       readonly ok: false;
@@ -228,6 +229,7 @@ const NODE_PTY_PROBE_SCRIPT = (
 ) => `printf 'nodePath:%s\\n' "$(command -v node 2>/dev/null)"
 printf 'nodeVersion:%s\\n' "$(node -p 'process.versions.node' 2>/dev/null)"
 printf 'resolvedPath:%s\\n' "$PATH"
+[ -S "\${SSH_AUTH_SOCK:-}" ] && printf 'sshAuthSock:%s\\n' "\${SSH_AUTH_SOCK:-}"
 cd ${shellQuote(linuxServerDir)} && node <<'NODE' >/dev/null 2>&1
 // The server bundle externalizes its deps to node_modules, and the WSL Node
 // can't read inside app.asar, so confirm those deps are unpacked on the real
@@ -344,6 +346,14 @@ export const parseResolvedPath = (stdout: string): string | null => {
   return resolvedPath.length > 0 ? resolvedPath : null;
 };
 
+export const parseSshAuthSock = (stdout: string): string | null => {
+  const prefix = "sshAuthSock:";
+  const line = stdout.split("\n").find((candidate) => candidate.startsWith(prefix));
+  if (line === undefined) return null;
+  const sshAuthSock = line.slice(prefix.length).replace(/\r$/, "");
+  return sshAuthSock.length > 0 ? sshAuthSock : null;
+};
+
 export const formatMissingToolsReason = (
   report: ToolchainReport,
   requiredRange: string | null,
@@ -416,6 +426,7 @@ const ensureNodePtyImpl = (
     );
     const nodePath = parseNodePath(probe.stdout);
     const resolvedPath = parseResolvedPath(probe.stdout);
+    const sshAuthSock = parseSshAuthSock(probe.stdout);
 
     const transportFailureReason = formatWslShellTransportFailureReason(probe.transportFailure);
     if (transportFailureReason !== null) {
@@ -490,7 +501,7 @@ const ensureNodePtyImpl = (
           fatal: true,
         } as const;
       }
-      return { ok: true, nodePath, resolvedPath } as const;
+      return { ok: true, nodePath, resolvedPath, sshAuthSock } as const;
     }
 
     if (options.allowBuild !== true) {
@@ -571,7 +582,7 @@ const ensureNodePtyImpl = (
         retryLimit: BUILD_TRANSPORT_RETRY_LIMIT,
       } as const;
     }
-    if (build.exitCode === 0) return { ok: true, nodePath, resolvedPath } as const;
+    if (build.exitCode === 0) return { ok: true, nodePath, resolvedPath, sshAuthSock } as const;
     const trimmedTail = `${build.stdout}${build.stderr}`.trim().slice(-500);
     return {
       ok: false,

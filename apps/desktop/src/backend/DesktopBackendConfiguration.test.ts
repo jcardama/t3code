@@ -199,7 +199,12 @@ describe("DesktopBackendConfiguration", () => {
                 },
                 ensureNodePty: (distro) => {
                   observedDistros.push(distro);
-                  return { ok: true, nodePath: "/usr/bin/node", resolvedPath: "/usr/bin:/bin" };
+                  return {
+                    ok: true,
+                    nodePath: "/usr/bin/node",
+                    resolvedPath: "/usr/bin:/bin",
+                    sshAuthSock: null,
+                  };
                 },
                 getDistroIp: (distro) => {
                   observedDistros.push(distro);
@@ -220,6 +225,7 @@ describe("DesktopBackendConfiguration", () => {
 
       assert.equal(config.runningDistro, "Ubuntu");
       assert.deepEqual(config.args.slice(0, 2), ["-d", "Ubuntu"]);
+      assert.isFalse(config.args.some((arg) => arg.startsWith("SSH_AUTH_SOCK=")));
       assert.deepEqual(observedDistros, ["Ubuntu", "Ubuntu", "Ubuntu"]);
       assert.isTrue(Option.isNone(config.preflightFailure));
     }).pipe(Effect.scoped, Effect.provide(NodeServices.layer)),
@@ -241,6 +247,7 @@ describe("DesktopBackendConfiguration", () => {
         const nodePath = "/home/test user's/.nvm/versions/node/v22.0.0/bin/node";
         const linuxEntryPath = "/tmp/t3 code's launch/entry file.mjs";
         const resolvedPath = "/home/test user/bin:/opt/test's tools/bin:/usr/bin:/bin";
+        const sshAuthSock = "/tmp/ssh-abc/agent.42";
         const devServerUrl = "http://127.0.0.1:5733/dev%20assets/?label=hello%20world";
         const config = yield* Effect.gen(function* () {
           const configuration = yield* DesktopBackendConfiguration.DesktopBackendConfiguration;
@@ -255,7 +262,7 @@ describe("DesktopBackendConfiguration", () => {
                   isAvailable: true,
                   distros: [{ name: "Ubuntu", isDefault: true, version: 2 }],
                   windowsToWslPath: () => Option.some(linuxEntryPath),
-                  ensureNodePty: () => ({ ok: true, nodePath, resolvedPath }),
+                  ensureNodePty: () => ({ ok: true, nodePath, resolvedPath, sshAuthSock }),
                   getDistroIp: () => Option.some("172.27.0.99"),
                 }),
               ),
@@ -279,6 +286,7 @@ describe("DesktopBackendConfiguration", () => {
           "--exec",
           "env",
           "PATH=/home/test user's/.nvm/versions/node/v22.0.0/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/home/test user/bin:/opt/test's tools/bin:/usr/bin:/bin",
+          `SSH_AUTH_SOCK=${sshAuthSock}`,
           nodePath,
           linuxEntryPath,
           "--bootstrap-fd",

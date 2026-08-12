@@ -221,6 +221,7 @@ interface WslPreflightSuccess {
   // PATH captured from the same login shell after the shared resolver loaded
   // version managers. The launch forwards this value directly without a shell.
   readonly resolvedPath: string;
+  readonly sshAuthSock: string | null;
 }
 
 interface WslPreflightFailure {
@@ -327,6 +328,7 @@ const runWslPreflight = Effect.fn("desktop.backendConfiguration.wslPreflight")(f
     linuxEntryPath: linuxEntry.value,
     nodePath: nodePtyResult.nodePath,
     resolvedPath: nodePtyResult.resolvedPath,
+    sshAuthSock: nodePtyResult.sshAuthSock,
   } as const;
 });
 
@@ -595,6 +597,7 @@ const resolveWslStartConfig = Effect.fn("desktop.backendConfiguration.resolveWsl
       "--exec",
       "env",
       `PATH=${launchPath}`,
+      ...(preflight.sshAuthSock !== null ? [`SSH_AUTH_SOCK=${preflight.sshAuthSock}`] : []),
       preflight.nodePath,
       preflight.linuxEntryPath,
       "--bootstrap-fd",
